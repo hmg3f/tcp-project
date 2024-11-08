@@ -1,0 +1,13 @@
+cradle:
+  cabal:
+    - path: "app/Client.hs"
+      component: "tcp-project:exe:client"
+
+    - path: "app/Utils.hs"
+      component: "tcp-project:exe:client"
+
+    - path: "app/Server.hs"
+      component: "tcp-project:exe:server"
+
+    - path: "app/Utils.hs"
+      component: "tcp-project:exe:server"
