@@ -5,7 +5,6 @@ import Control.Concurrent
 import qualified Control.Exception as E
 import Control.Monad (when)
 import Control.Monad.Fix (fix)
-import qualified Data.ByteString.Char8 as C
 import Network.Socket
 import System.IO
 import Text.ParserCombinators.Parsec
@@ -97,41 +96,27 @@ evalExprStr str = getParsed $ parse parseExprStr [] str
 ----------------
 --    ECHO    --
 ----------------
-wrapMessage :: Handle -> (Handle -> IO ()) -> IO ()
+wrapMessage :: Handle -> (Handle -> String -> IO ()) -> IO ()
 wrapMessage handle func = do
   hGetLine handle >>= putStrLn
   hPutStrLn handle "Hello from Server! - Harrison"
 
-  func handle
+  func handle "Client"
 
-  hGetLine handle >>= putStrLn
-  hPutStrLn handle "Bye from Server - Harrison"
-
-echo :: Handle -> IO ()
-echo handle =  do
-  forkIO $ fix $ \loop -> do
-    line <- hGetLine handle
-    putStrLn $ "Client: " ++ line
-    loop
-
-  getServerInput
-    where getServerInput = do
-            input <- getLine
-            case input of
-              "/bye" -> hPutStrLn handle input
-              _ -> hPutStrLn handle input >> getServerInput
+  putStrLn "Bye from Client - Harrison"
 
 --------------------
 --    TRANSFER    --
 --------------------
 transfer :: Handle -> IO ()
 transfer handle = do
-  file <- C.hGetContents handle
+  file <- hGetLine handle
 
-  let file_mod = C.append file $ C.pack "\nAdded by server"
+  let file_mod = file ++ "\nAdded by server"
 
-  C.putStrLn file_mod
-  C.writeFile "/tmp/recv.txt" file_mod
+  writeFile "/tmp/recv.txt" file_mod
+
+  hPutStr handle file_mod
 
 ----------------
 --    CHAT    --
@@ -139,11 +124,10 @@ transfer handle = do
 chat :: Handle -> Chan Msg -> Int -> IO ()
 chat handle chan msgNum = do
   let broadcast msg = writeChan chan (msgNum, msg)
-  
-  hPutStrLn handle "Hi, what's your name?"
+
+  hPutStrLn handle "Enter your username:"
   name <- hGetLine handle
   broadcast ("--> " ++ name ++ " entered chat.")
-  --hPutStrLn handle ("Welcome, " ++ name ++ "!")
 
   commLine <- dupChan chan
 
@@ -157,7 +141,7 @@ chat handle chan msgNum = do
     line <- hGetLine handle
     case line of
       -- If an exception is caught, send a message and break the loop
-      "quit" -> hPutStrLn handle "Bye!"
+      "quit" -> hPutStrLn handle "Goodbye."
       -- else, continue looping.
       _ -> broadcast (name ++ ": " ++ line) >> loop
 
@@ -184,7 +168,7 @@ clientOperation handle chan msgNum = do
   operation <- hGetLine handle
 
   case operation of
-    "/echo" -> wrapMessage handle echo
+    "/echo" -> wrapMessage handle U.echo
     "/file" -> transfer handle
     "/chat" -> chat handle chan msgNum
     "/calc" -> calc handle
@@ -192,13 +176,12 @@ clientOperation handle chan msgNum = do
 
 runConn :: (Socket, SockAddr) -> Chan Msg -> Int -> IO ()
 runConn (sock, _) chan msgNum = do
-    
   handle <- socketToHandle sock ReadWriteMode
   hSetBuffering handle NoBuffering
- 
+
   clientOperation handle chan msgNum
-    
-  hClose handle                             -- close the handle
+
+  hClose handle
 
 mainLoop :: Socket -> Chan Msg -> Int -> IO ()
 mainLoop sock chan msgNum = do
@@ -223,14 +206,3 @@ main = do
   mainLoop sock chan 0
 
   close sock
-
-  -- (conn, _) <- accept sock
-  -- putStrLn "New connection accepted"
-
-  -- handle <- socketToHandle conn ReadWriteMode
-  -- hSetBuffering handle NoBuffering
-
-  -- clientOperation handle
-
-  -- close conn
-  -- close sock

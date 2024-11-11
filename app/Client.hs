@@ -7,40 +7,30 @@ import System.IO
 import Control.Concurrent
 import Control.Monad.Fix (fix)
 import Control.Monad.IO.Class
-import qualified Data.ByteString.Char8 as C
+--import Network.Socket.ByteString (sendAll)
 import Data.Char
 import Data.List
 import Data.Maybe
 
+import qualified Utils as U
+
 trim :: String -> String
 trim = dropWhileEnd isSpace . dropWhile isSpace
+
+chunkSize :: Int
+chunkSize = 1024
 
 ----------------
 --    ECHO    --
 ----------------
-wrapMessage :: Handle -> (Handle -> IO ()) -> IO ()
+wrapMessage :: Handle -> (Handle -> String -> IO ()) -> IO ()
 wrapMessage handle func = do
   hPutStrLn handle "Hello from Client! - Harrison"
   hGetLine handle >>= putStrLn
 
-  func handle
+  func handle "Server"
 
-  hPutStrLn handle "Bye from Client - Harrison"
-  hGetLine handle >>= putStrLn
-
-echo :: Handle -> IO ()
-echo handle =  do
-  forkIO $ fix $ \loop -> do
-    line <- hGetLine handle
-    putStrLn $ "Server: " ++ line
-    loop
-  -- TODO: can kill threads. Use this to cancel the communication
-  getInput
-    where getInput = do
-            input <- getLine
-            case input of
-              "/bye" -> hPutStrLn handle input
-              _ -> hPutStrLn handle input >> getInput
+  putStrLn "Bye from Server - Harrison"
 
 --------------------
 --    TRANSFER    --
@@ -50,10 +40,11 @@ transfer handle = runInputT defaultSettings $ do
   filename <- getInputLine "f% "
 
   liftIO $ do
-    contents <- C.readFile $ trim $ fromJust filename
-    C.hPutStr handle contents
-    hFlush handle
-    hClose handle
+    contents <- readFile $ trim $ fromJust filename
+    hPutStr handle contents
+
+    hGetLine handle >>= putStrLn
+    hGetLine handle >>= putStrLn
 
 ----------------
 --    CHAT    --
@@ -61,7 +52,7 @@ transfer handle = runInputT defaultSettings $ do
 chat :: Handle -> IO ()
 chat handle = do
   hSetBuffering stdout NoBuffering
-  
+
   forkIO $ fix $ \loop -> do
     hGetLine handle >>= putStrLn
     loop
@@ -79,7 +70,7 @@ chat handle = do
 calc :: Handle -> IO ()
 calc handle = runInputT (Settings noCompletion Nothing False) $ do
   mexpr <- getInputLine "c% "
-  case mexpr of 
+  case mexpr of
     Nothing -> return ()
     Just input -> liftIO $ hPutStrLn handle input
 
@@ -99,7 +90,7 @@ chooseOperation handle = runInputT defaultSettings $ do
   moperation <- getInputLine "op% "
   case moperation of
     Nothing -> return ()
-    Just "/echo" -> liftIO $ hPutStrLn handle (fromJust moperation) >> wrapMessage handle echo
+    Just "/echo" -> liftIO $ hPutStrLn handle (fromJust moperation) >> wrapMessage handle U.echo
     Just "/file" -> liftIO $ hPutStrLn handle (fromJust moperation) >> transfer handle
     Just "/chat" -> liftIO $ hPutStrLn handle (fromJust moperation) >> chat handle
     Just "/calc" -> liftIO $ hPutStrLn handle (fromJust moperation) >> calc handle

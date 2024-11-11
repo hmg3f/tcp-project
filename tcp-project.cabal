@@ -27,7 +27,8 @@ executable client
                       haskeline ^>=0.8.2.1,
                       network ^>=3.2.4.0,
                       directory ^>=1.3.9.0,
-                      text ^>=2.1.2
+                      text ^>=2.1.2,
+                      split ^>=0.2.5
     hs-source-dirs:   app
     default-language: Haskell2010
 
@@ -40,6 +41,7 @@ executable server
                       network ^>=3.2.4.0,
                       text ^>=2.1.2,
                       bytestring ^>=0.12.1.0,
-                      parsec ^>=3.1.17.0
+                      parsec ^>=3.1.17.0,
+                      split ^>=0.2.5
     hs-source-dirs:   app
     default-language: Haskell2010
